@@ -1,0 +1,67 @@
+# Point-LIO Configuration for Unitree L2 LiDAR
+# Lunabotics 2026 — PFW Team
+#
+# Point-LIO provides map→odom TF via LiDAR-inertial odometry.
+# EKF (robot_localization) provides odom→base_footprint.
+#
+# Based on: github.com/dfloreaa/point_lio_ros2 config/unilidar_l2.yaml
+# Tuned for UCF arena (small indoor, ~8m x 5m)
+
+/**:
+    ros__parameters:
+        common:
+            lid_topic: "/unilidar/cloud"
+            imu_topic: "/unilidar/imu"
+            con_frame: false
+            con_frame_num: 1
+            cut_frame: false
+            cut_frame_time_interval: 0.1
+            time_lag_imu_to_lidar: 0.0
+
+        preprocess:
+            lidar_type: 5             # 5 = Unitree L2
+            scan_line: 18             # L2 vertical scan lines
+            timestamp_unit: 0         # 0 = seconds
+            blind: 0.05              # L2 min range is 0.05m
+
+        mapping:
+            imu_en: true
+            start_in_aggressive_motion: false
+            extrinsic_est_en: false   # L2 has factory-calibrated IMU
+            imu_time_inte: 0.005      # 200 Hz IMU → 5 ms
+            satu_acc: 30.0
+            satu_gyro: 35.0
+            acc_norm: 9.81
+            lidar_meas_cov: 0.01
+            acc_cov_output: 500.0
+            gyr_cov_output: 1000.0
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            imu_meas_acc_cov: 0.1
+            imu_meas_omg_cov: 0.1
+            gyr_cov_input: 0.01
+            acc_cov_input: 0.1
+            plane_thr: 0.1
+            match_s: 81.0
+            fov_degree: 180.0
+            det_range: 5.0            # Small room testing — ignore far points
+            gravity_align: true
+            gravity: [0.0, 0.0, -9.810]
+            gravity_init: [0.0, 0.0, -9.810]
+            # Extrinsic: LiDAR pose in IMU frame (L2 built-in, factory calibrated)
+            extrinsic_T: [0.007698, 0.014655, -0.00667]
+            extrinsic_R: [1.0, 0.0, 0.0,
+                          0.0, 1.0, 0.0,
+                          0.0, 0.0, 1.0]
+
+        odometry:
+            publish_odometry_without_downsample: true
+
+        publish:
+            path_en: false            # Don't need path viz in competition
+            scan_publish_en: false    # Perception pipeline handles clouds
+            scan_bodyframe_pub_en: false
+
+        pcd_save:
+            pcd_save_en: false
+            interval: -1

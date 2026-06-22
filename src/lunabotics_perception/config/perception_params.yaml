@@ -1,0 +1,141 @@
+# Unified Obstacle Detector Configuration
+# Lunabotics 2026 - PFW Team
+
+unified_obstacle_detector:
+  ros__parameters:
+    # ============================================
+    # ROI (Region of Interest) — 360-degree radial
+    # ============================================
+    # NOTE: LiDAR is permanently mounted front-center, 50.5cm above ground.
+    # range_min=0.25m — centered mount, no lateral chassis self-hits.
+    roi:
+      range_min: 0.25      # Minimum radial distance (m) - centered mount, minimal self-occlusion
+      range_max: 6.0       # Maximum radial distance (m) - detect obstacles early for global planner
+      height_min: -0.60    # Minimum height (m) - LiDAR at 50.5cm, ground at ~-0.505m in LiDAR frame
+      height_max: 0.8      # Maximum height (m) - detect tall obstacles
+      # Legacy params (kept for backwards compat, not used by 360-degree ROI)
+      forward_min: 0.50
+      forward_max: 3.0
+      lateral_max: 2.5
+
+    # ============================================
+    # Ground Segmentation Parameters
+    # ============================================
+    ground:
+      ransac_threshold: 0.08       # Distance threshold for RANSAC inliers (m)
+                                    # Balanced for sim ground + real regolith roughness
+      ransac_iterations: 300        # Number of RANSAC iterations
+      min_points: 50                # Minimum points required for valid plane
+      height_tolerance: 0.20        # Height tolerance for ground classification (m)
+                                    # Points within ±0.20m of plane = ground
+                                    # Raised from 0.12 for sand testing (ridges up to ~15cm)
+
+    # ============================================
+    # Crater Detection Parameters
+    # ============================================
+    crater:
+      depth_threshold: 0.30         # Minimum crater depth to detect (m)
+                                    # Craters < 30cm deep are ignored (real craters are 40cm+)
+      inversion_enabled: true       # Enable crater inversion technique
+
+    # ============================================
+    # Rock Detection Parameters
+    # ============================================
+    rock:
+      height_threshold: 0.20        # Minimum rock height above ground (m)
+                                    # Rocks < 20cm tall are ignored (sand ridges)
+
+    # ============================================
+    # Clustering Parameters (DBSCAN)
+    # ============================================
+    cluster:
+      eps: 0.25                     # Max distance between points in a cluster (m)
+                                    # Larger eps = fewer clusters = faster DBSCAN
+      min_points: 3                 # Minimum points to form a valid cluster
+                                    # Clusters smaller than this are discarded as noise
+
+    # ============================================
+    # Blocked Corridor Parameters
+    # ============================================
+    blocked:
+      lookahead: 1.5               # Forward distance to check for blockage (m)
+      half_width: 0.41             # Half robot width + buffer (0.66/2 + 0.08 = 0.41m)
+
+    # ============================================
+    # Inflation Parameters
+    # ============================================
+    inflation:
+      radius: 0.30                  # Safety margin around obstacles (m)
+      enabled: false                # Disabled — Nav2 inflation_layer handles this
+
+    # ============================================
+    # Publishing Parameters
+    # ============================================
+    publish_rate: 2.0               # Publishing frequency (Hz) — minimal for Jetson CPU budget
+    debug_mode: false               # Enable debug topic publishing
+
+zone_detector:
+  ros__parameters:
+    publish_rate: 5.0
+
+    # UCF Arena 2026: 8.10m × 4.57m, origin at center
+    # +X = ingress (right), -X = judges (left)
+    # Obstacle zone (4.1m) includes construction zone (2.6m)
+    # Starting zone (2.0m) is subset of excavation zone (4.0m)
+    zones:
+      starting:
+        x_min:  2.05
+        x_max:  4.05
+        y_min: -2.285
+        y_max:  2.285
+      excavation:
+        x_min:  0.05
+        x_max:  4.05
+        y_min: -2.285
+        y_max:  2.285
+      construction:
+        x_min: -4.05
+        x_max: -1.45
+        y_min: -2.285
+        y_max:  2.285
+      obstacle:
+        x_min: -4.05
+        x_max:  0.05
+        y_min: -2.285
+        y_max:  2.285
+
+localization_quality_monitor:
+  ros__parameters:
+    publish_rate: 2.0
+    odom_timeout_sec: 2.0
+    tf_timeout_sec:   2.0
+    cov_good_thresh:     0.04
+    cov_degraded_thresh: 0.25
+
+# ============================================
+# Parameter Tuning Guide
+# ============================================
+#
+# For AGGRESSIVE navigation (faster, riskier):
+#   - Increase cluster.eps to 0.20m (merge nearby clusters)
+#   - Increase ground.height_tolerance to 0.25m (ignore more sand ridges)
+#   - Increase crater.depth_threshold to 0.25m
+#
+# For CONSERVATIVE navigation (slower, safer):
+#   - Decrease cluster.eps to 0.10m (tighter clusters)
+#   - Decrease cluster.min_points to 3 (detect smaller obstacles)
+#   - Decrease ground.height_tolerance to 0.12m (detect smaller bumps)
+#
+# For TESTING/DEBUGGING:
+#   - Set debug_mode: true
+#   - Visualize in RViz:
+#     * /perception/debug/roi (cyan)
+#     * /perception/debug/ground (green)
+#     * /perception/debug/rocks (orange) — post-clustering
+#     * /perception/debug/craters (blue) — post-clustering
+#     * /perception/unified_obstacles (red)
+#
+# For COMPETITION DAY:
+#   - Start with DEFAULT values
+#   - Tune cluster.min_points based on point density
+#   - Test 5+ runs before committing to changes

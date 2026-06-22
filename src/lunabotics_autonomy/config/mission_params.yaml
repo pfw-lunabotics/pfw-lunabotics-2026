@@ -1,0 +1,330 @@
+# Mission Controller Configuration
+# Lunabotics 2026 — PFW Team — UCF Arena
+#
+# Full autonomous cycle: [Navigate → Excavate → Traverse → Deposit] × N
+# Arena: 8.10m × 4.57m, origin at center
+# Run time: 30 minutes per attempt
+
+mission_controller:
+  ros__parameters:
+    use_sim_time: true
+
+    # Maximum cycles (time is the real limiter)
+    num_cycles: 10
+
+    # 30 min run, 1 min safety margin
+    mission_timeout_sec: 1740.0
+
+    # Stop starting new cycles with less than this remaining
+    return_reserve_sec: 120.0
+
+    # Total excavation time per cycle (seconds) — hard cap on the step-and-dig
+    # loop. If this expires, mission_controller triggers RETRACT regardless of
+    # how loaded the box is. 90s ≈ 1 full DESCEND (~22s) + SETTLE (15s) +
+    # ~3 DWELL+ADVANCE cycles (each ~17s). Enough for ~3 dig spots.
+    dig_duration_sec: 90.0
+
+    # Cycle-1 dig-in-place: skip the nav-to-excavation leg on the first cycle
+    # and start digging right at the spawn position. Legal because the
+    # starting zone is a subset of the excavation zone in the UCF spec.
+    # Cycle 2+ resumes the normal nav-back-to-excavation flow.
+    # Scenario 2 final flow: TRUE — step-and-dig moves us westward while
+    # digging, so cycle 1 just starts immediately after ALIGN+MAP_AHEAD.
+    dig_at_start_zone: true
+
+    # Dump completion (servo open → material falls → stow)
+    # Primary: monitor weight, stow as soon as weight returns to baseline.
+    # Fallback: if no weight sensor data, wait dump_wait_sec then stow.
+    # Hard cap: dump_max_wait_sec — never wait longer than this even if
+    #            weight never returns (material stuck, sensor noisy).
+    dump_wait_sec: 10.0                  # legacy fallback (no weight sensor)
+    dump_max_wait_sec: 20.0              # hard cap on dump wait
+    dump_baseline_threshold_kg: 1.0      # consider "empty" if weight - baseline <= this
+
+    # Max time per navigation goal (seconds)
+    # Kept under 2 min to avoid 5-minute movement rule (Section 6.1.4)
+    # Boot (15s) + localization (30s) + align (7s) + map (4s) + nav_timeout = ~176s < 300s
+    nav_timeout_sec: 120.0
+
+    # Localization
+    localization_wait_timeout: 30.0
+    min_localization_confidence: 0.3
+
+    # Waypoints — arena coordinates (origin = center)
+    waypoint_excavation_x:    2.0
+    waypoint_excavation_y:    0.0
+    waypoint_excavation_yaw:  180.0     # face -X (toward obstacle zone)
+
+    # CYCLE 2+ excavation return — robot arrives FACING EAST after deposit so
+    # the next dig advances east, leaving the rear naturally pointed at the
+    # berm. Avoids a 180° flip on arrival AND a 180° flip after dig.
+    waypoint_excavation_return_x:    2.0
+    waypoint_excavation_return_y:    0.0
+    waypoint_excavation_return_yaw:  0.0     # face +X (east, away from berm)
+
+    # Berm waypoint sits OUTSIDE the front face of the 4-beam square.
+    # Nav2 navigates here, then mission_controller open-loop reverses INTO
+    # the square (closed-loop on beam-pair detection — see berm_* params below).
+    # Convention (post-2026-05-15): +X=east (fiducial), +Y=north (compass-anchored).
+    # Layout A = TOP arena (berm at NW corner, +Y); Layout B = BOTTOM arena
+    # (berm at SW corner, mission_controller negates → -Y).
+    waypoint_berm_x:         -1.5       # gap mouth (front face is at ~-2.32)
+    waypoint_berm_y:          1.3       # Layout A (TOP): berm at +Y north; Layout B (BOTTOM): negated → -1.3
+    waypoint_berm_yaw:        0.0       # face +X, rear faces berm
+
+    # Starting pose — WHERE robot was placed (operator updates before start)
+    # Convention: +X=east (fiducial wall), +Y=north (compass-anchored, both arenas).
+    # YAW (CCW from +X): 0=East, 90=North, 180=West, 270=South.
+    # Default (3.0, 0.0, 180°) = mid-arena along Y, 1m west of fiducial, facing berm.
+    # Arena A (TOP) typical: y ≈ -1.0 (near divider). Arena B (BOTTOM): y ≈ +1.0.
+    start_x: 3.0
+    start_y: 0.0
+    start_yaw_deg: 180.0
+
+    # ============================================
+    # Smart Excavation — weight-aware digging
+    # ============================================
+    # Monitors deposition box weight sensor during excavation.
+    # If weight gain stalls (sand level dropped), robot nudges forward
+    # to reach fresh sand. Belt keeps running during nudge.
+    # Falls back to pure time-based if no weight sensor data.
+
+    # ============================================
+    # Alignment + Forward Mapping
+    # ============================================
+    # Instead of a full 360° scan (risks sinking in regolith), compute
+    # the minimum rotation to face the excavation waypoint and turn
+    # only that amount. Skips rotation entirely if already within tolerance.
+    # Then dwell facing forward to let LiDAR map all obstacles ahead
+    # (obstacles are only in the forward direction — walls are behind).
+    align_speed: 0.4                     # rad/s rotation speed
+    align_tolerance_deg: 15.0            # skip rotation if within this (degrees)
+    map_dwell_sec: 4.0                   # seconds to map obstacles after aligning
+                                         # (perception 2Hz × costmap 2Hz = ~8 frames)
+
+    # ============================================
+    # Software E-stop (disable for competition)
+    # ============================================
+    # During autonomous competition runs, team is HANDS-FREE and cannot
+    # clear a software e-stop. Physical E-STOP button on the robot handles
+    # real emergencies. Set false for competition to prevent transient
+    # sensor failures from permanently killing the mission.
+    software_estop_enabled: false
+
+    # ============================================
+    # Berm Edge-Alignment Deposit
+    # ============================================
+    # Deposition door drops material straight DOWN at the rear of the robot.
+    # We never enter the berm square — robot rear aligns with the FRONT FACE
+    # of the 4-beam square, door tilts open, material falls just inside the
+    # front edge. Same logic for ALL cycles (cycle 1 = cycle 2+ = "edge").
+    #
+    # Sequence (every cycle):
+    #   1. Nav2 to gap-mouth waypoint (~0.5m in front of beam square)
+    #   2. Pre-reverse LATERAL CHECK (Y-centroid of front beam pair).
+    #      If off by > lateral_tolerance, ABORT deposit (skip to next cycle).
+    #   3. Slow reverse, watch rear-cone for the front beam pair.
+    #      Stop on (a) dist <= cycle2plus_stop_distance,
+    #              (b) pair release (dist jumps — beams now beside us),
+    #              (c) emergency dist <= emergency_stop_distance,
+    #              (d) max-time timeout.
+    #   4. DEPOSIT (servo tilts door)
+    #   5. STOW + FORWARD EXIT (~40cm forward to clear beam inflation zone)
+    #   6. Nav2 to excavation waypoint
+    #
+    # Arena layout — A (default) or B (mirror pit, berm Y flipped).
+    arena_layout: 'A'
+
+    berm_reverse_speed: -0.08                   # m/s (negative = backward)
+    berm_reverse_duration: 12.0                 # MAX-TIME fallback (~96cm; beams should
+                                                # trigger stop well before this)
+    berm_reverse_duration_first: 12.0           # DEPRECATED (kept for backwards compat;
+                                                # cycle 1 now uses berm_reverse_duration)
+
+    # Geometry — LiDAR mounted at front of robot (URDF: +0.62m from base_link).
+    # User-measured distance from LiDAR to physical rear bumper:
+    lidar_to_rear_offset: 1.10                  # m, LiDAR forward of rear bumper
+
+    # Rear cone — region monitored during reverse for beam detection
+    berm_rear_cone_half_width: 0.55             # m, lateral half-width
+                                                # (must include beams at Y ≈ ±0.50m)
+    berm_rear_cone_max_lookback: 2.5            # m, how far behind rear to look
+    berm_rear_cone_min_z: -0.40                 # m, drop ground (LiDAR ~0.50m above)
+    berm_rear_cone_max_z: 0.60                  # m, drop overhead noise
+    berm_rear_min_points: 3                     # min cluster size to trust as obstacle
+
+    # Pair-detection thresholds (front pair = front beams of square)
+    berm_pair_detect_threshold: 1.0             # m, dist to declare "pair approaching"
+    berm_pair_release_threshold: 0.50           # m, observed-min dist required to count pair
+    berm_cycle1_stop_distance: 0.05             # m, DEPRECATED (cycle 1 now uses cycle2plus)
+    berm_cycle2plus_stop_distance: 0.03         # m, 3cm buffer between rear bumper and front beam
+    berm_emergency_stop_distance: 0.05          # m, hard collision stop (fires AFTER stop)
+    berm_cloud_stale_timeout: 1.0               # s, ignore cloud if older than this
+
+    # Pre-reverse LATERAL alignment check (must be centered or we hit a side beam)
+    # Robot half-width 0.41m, side beams at ±0.50m → only 9cm clearance per side.
+    # Nav2's xy_goal_tolerance is 0.15m so we need our own check.
+    berm_lateral_check_half_width: 0.80         # m, wider cone for centroid (catches
+                                                # beams even if we're somewhat off)
+    berm_lateral_tolerance: 0.05                # m, abort deposit if |Y-offset| > this
+                                                # (5cm leaves 4cm margin to beam edge)
+    # If the offset is OFF but within this bound, mission_controller sends a
+    # Nav2 fix-up goal at the beam-computed corrected Y BEFORE aborting (one
+    # attempt per cycle). Beams act as fiducials so a wrong setpose doesn't
+    # doom every deposit. Set to 0 to disable beam correction.
+    berm_max_beam_correction: 0.5               # m
+
+    # Forward EXIT after deposit — clear beam inflation zone for Nav2
+    # Beam at X=-2.32, inflation_radius=0.70m → inflated zone reaches X=-1.62.
+    # Robot center at edge stop ≈ X=-1.78, INSIDE inflation. Drive forward
+    # ~40cm to clear it before handing back to Nav2.
+    berm_exit_forward_speed: 0.08               # m/s (positive = forward)
+    berm_exit_forward_duration: 5.0             # s (~40cm at 0.08 m/s)
+
+    # ============================================
+    # Smart Excavation — weight-aware digging
+    # ============================================
+    weight_topic: /deposition/weight     # Float32 (kg)
+    weight_check_interval: 15.0          # legacy: weight check interval (unused in step-and-dig)
+    min_weight_gain_kg: 0.05             # legacy: min gain for "making progress" (unused in step-and-dig)
+    nudge_speed: 0.05                    # legacy: m/s during nudge (unused in step-and-dig)
+    nudge_duration: 4.0                  # legacy: seconds per nudge (unused in step-and-dig)
+    max_nudges: 6                        # legacy: max nudges per cycle (unused in step-and-dig)
+    max_load_kg: 10.0                    # stop digging when weight GAIN exceeds this (kg)
+    weight_timeout: 10.0                 # ignore sensor if stale >10s
+
+    # ============================================
+    # Step-and-Dig Pattern (Scenario 2 final flow)
+    # ============================================
+    # Replaces the old "continuous forward + nudge" pattern. Instead:
+    #   1. ORIENT to dig heading (handled by ALIGN — face excavation waypoint)
+    #   2. LOWER actuator (belt engages at 60% depth, ramps to 21000 PWM
+    #      by the time actuator hits 85% depth — see excavation_bridge params)
+    #   3. DWELL in place 6-9s, watching weight rate (∂m/∂t over 2s window)
+    #   4. If weight rate >= stall_threshold → keep dwelling (scoops are loading)
+    #      If weight rate < stall_threshold AND dwell_min reached → try DEEPER once,
+    #         else ADVANCE 0.4m forward and dwell again
+    #   5. Obstacle ahead during ADVANCE → DODGE (stop belt, turn, drive past,
+    #      resume belt). NEVER turn with belt running — bridge auto-pauses belt
+    #      on |angular.z|>turn_threshold, plus mission_controller explicitly
+    #      calls /excavation/belt_pause before any turn.
+    #   6. Exit traverse when arena X drops below dig_zone_x_min (excavation
+    #      zone safety margin) OR total weight gain >= max_load_kg OR time
+    #      budget exhausted.
+    dig_dwell_sec_min: 6.0               # min dwell at each spot (gather weight data)
+    dig_dwell_sec_max: 10.0              # max dwell — advance even if still loading
+    dig_advance_distance_m: 0.4          # forward step between dwells (Point-LIO odometry)
+    dig_advance_speed: 0.05              # m/s during step-forward (slow crawl)
+    dig_weight_window_sec: 2.0           # rolling window for weight-rate calc
+    dig_weight_stall_threshold_kg: 0.2   # stall if Δweight < this over the 2s window
+
+    # Excavation zone safety: do NOT advance west of this arena-X.
+    # Excavation zone runs X∈[0.05, 4.05]. We stop at 0.5 to leave a 45cm buffer
+    # so an in-flight advance doesn't carry us across the boundary.
+    dig_zone_x_min: 0.5
+
+    # East boundary for cycle 2+ dig (which advances east, into the start zone).
+    # Start zone east wall is X=4.05; we stop at 3.7 to leave a 35cm buffer.
+    dig_zone_x_max: 3.7
+
+    # Step-and-dig DEEPER fallback — when weight stalls at 85%, push actuator
+    # to 92% before resorting to ADVANCE. Triggers /excavation/dig_deeper.
+    dig_deeper_settle_sec: 2.5           # wait after dig_deeper for actuator to reach new cap
+
+    # After bridge signals needs_nudge (commanded-cap reached), wait this long
+    # for the physical actuator to catch up before starting the first DWELL.
+    # Math: bridge fires needs_nudge at t≈10.5s into DIG. Actuator physically
+    # starts moving at t=2.5s (first step) and travels 170 units (from +100
+    # to -70) at ~7.7 units/s = 22s of motion → physical -70 reached at
+    # t≈24.5s. Settle therefore must be ≥ 24.5 − 10.5 = 14s. Bumped to 15s
+    # for 1s margin against cold-boot actuator drift / Sabertooth response lag.
+    dig_descend_settle_sec: 15.0
+
+    # Rock dodge (during ADVANCE, when path_blocked_ahead fires)
+    # CRITICAL: belt MUST be stopped before turning (power budget).
+    dodge_belt_settle_sec: 1.5           # wait after belt_pause before turning
+    dodge_turn_rad: 0.52                 # 30° turn to dodge
+    dodge_turn_speed: 0.5                # rad/s during dodge turn
+    dodge_forward_m: 0.6                 # forward distance past obstacle
+    dodge_forward_speed: 0.08            # m/s during dodge forward
+    dodge_max_attempts: 2                # if dodge fails this many times → exit dig
+
+    # Hazard threshold used to trigger DODGE during ADVANCE
+    dig_obstacle_block_distance: 0.85    # m — exit ADVANCE if obstacle this close in forward corridor
+
+    # ============================================
+    # Cycle 2+ open-loop reverse-to-berm
+    # ============================================
+    # After cycle 2+ dig (robot facing east, rear toward berm), drive straight
+    # backward with rear-cone obstacle check, then hand off to Nav2 for the
+    # final Y shift + alignment. Saves the ~10-15s 180° flip that Nav2 would
+    # otherwise do at the berm waypoint.
+    reverse_to_berm_speed: -0.10           # m/s (negative = backward)
+    reverse_to_berm_target_x: -1.0         # arena X to stop open-loop reverse
+    reverse_to_berm_max_sec: 50.0          # timeout (safety, ~5m max at -0.10)
+    reverse_to_berm_rear_clearance: 0.40   # m, bail to Nav2 if rear cone closer than this
+    reverse_to_berm_min_pts: 5             # min cluster size to trust as "real" obstacle
+
+excavation_bridge:
+  ros__parameters:
+    use_sim_time: true
+
+    simulate: true
+    software_estop_enabled: false        # Match mission controller — disabled for competition
+
+    # Sim dig duration set HIGH — mission controller manages actual timing
+    # via stow service. Bridge just keeps belt running until told to stop.
+    sim_dig_duration: 600.0              # 10 min (won't actually run this long)
+    sim_dump_duration: 10.0
+    sim_stow_duration: 3.0
+
+    command_topic: /excavation/command
+    status_topic: /excavation/status
+
+    # ============================================
+    # Hardware Motor/Actuator/Servo Parameters
+    # (only used when simulate: false)
+    # ============================================
+    # Actuator-FIRST excavation (Scenario 2 final flow):
+    #   1. Actuator starts lowering immediately at DIG.
+    #   2. Belt engages at actuator_belt_engage_pct (60%) at dig_pwm_start (10500).
+    #   3. Belt ramps to dig_pwm_target (21000) — fine-tuned safe band, well
+    #      below the 34500 we used earlier and well above the prior 13k
+    #      overcurrent shutdown (which was a wiring/direction issue).
+    #   4. Actuator stops at actuator_lower_cap_pct (85%) — ground clearance is
+    #      ~1 inch, so 100% would strike ground; 85% leaves margin.
+    #   5. If mission_controller asks for "deeper" (weight stalled at 85%),
+    #      bridge lowers cap to actuator_deeper_cap_pct (92%) for one cycle.
+    dig_pwm_start: 10500                 # Belt PWM at 60% actuator depth
+    dig_pwm_target: 21000                # Belt PWM cap (safe per latest fine-tuning)
+    dig_pwm_ramp_step: 1500              # PWM increase per interval
+    dig_pwm_ramp_interval: 1.0           # Seconds between ramp steps
+                                         # (10500→21000 over ~7s)
+
+    # Actuator lowers gradually in small steps (not all at once)
+    actuator_lower_val: -100             # Full extend (-100 = full down)
+    actuator_lower_cap_pct: 0.85         # Stop actuator descent at 85% depth
+    actuator_deeper_cap_pct: 0.92        # /excavation/dig_deeper extends cap to 92%
+    actuator_belt_engage_pct: 0.60       # Start belt when actuator passes 60% depth
+    actuator_raise_val: 100              # Full retract (+100 = full up)
+    actuator_settle_sec: 26.0            # Full travel time (for stow wait + depth est)
+    actuator_step_val: -15               # Step size per tick (negative = lower)
+    actuator_step_interval: 2.0          # Seconds between actuator steps
+    actuator_initial_delay: 0.5          # Delay before first actuator step (was 1.0)
+
+    # Deposition servo
+    deposition_dump_angle: 52.0          # Servo tilt angle for dumping (mechanical open at +52.8 deg from closed)
+    deposition_stow_angle: -10.0         # Stow angle (deg); -10 preloads servo against closed hard stop (tighter than -8, conservative vs -15 that tore the mount)
+    deposition_move_time_ms: 4500        # Servo movement duration (ms)
+
+    # Weight-aware actuator control
+    weight_topic: /deposition/weight     # Float32 (kg)
+    weight_gain_threshold: 0.02          # kg gain = "digging effectively"
+    weight_check_interval: 3.0           # seconds between weight checks
+    weight_stall_resume_sec: 5.0         # resume lowering if weight stalls
+
+    # Turn guard — pause excavation during turns (power budget)
+    # Turning the drivetrain takes too much power to run excavation
+    # simultaneously. Belt motor → 0 and actuator holds position
+    # while |angular.z| > threshold. Resumes automatically after turn.
+    turn_pause_threshold: 0.1            # rad/s — pause if turning faster than this

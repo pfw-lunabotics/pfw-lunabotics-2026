@@ -1,0 +1,124 @@
+<?xml version="1.0" ?>
+<sdf version='1.7'>
+  <model name='arena_frame_nasa'>
+    <pose>0 0 0 0 0 0</pose>
+    <static>true</static>
+    
+    <!-- Left Wall -->
+    <link name='left_wall'>
+      <pose>0 0 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry>
+          <box>
+            <size>0.1 5.0 0.6</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry>
+          <box>
+            <size>0.1 5.0 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    
+    <!-- Right Wall -->
+    <link name='right_wall'>
+      <pose>6.88 0 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry>
+          <box>
+            <size>0.1 5.0 0.6</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry>
+          <box>
+            <size>0.1 5.0 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    
+    <!-- Top Wall -->
+    <link name='top_wall'>
+      <pose>3.44 2.5 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry>
+          <box>
+            <size>6.88 0.1 0.6</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry>
+          <box>
+            <size>6.88 0.1 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    
+    <!-- Bottom Wall -->
+    <link name='bottom_wall'>
+      <pose>3.44 -2.5 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry>
+          <box>
+            <size>6.88 0.1 0.6</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry>
+          <box>
+            <size>6.88 0.1 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    
+    <!-- Center Pole -->
+    <link name='center_pole'>
+      <pose>3.63 0 2.5 0 0 0</pose>
+      <collision name='collision'>
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>5.0</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>5.0</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

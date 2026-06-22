@@ -1,0 +1,44 @@
+# robot_localization EKF Configuration — IMU ONLY (testing, no Point-LIO)
+# For obstacle avoidance testing without Point-LIO.
+# Will drift over time but fine for short tests.
+
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: false
+    frequency: 30.0
+    two_d_mode: true
+    publish_tf: true            # EKF publishes odom→base_footprint
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+
+    # Only IMU — no odom source
+    imu0: /unilidar/imu
+    imu0_differential: false
+    imu0_relative: true
+    imu0_queue_size: 50
+    imu0_remove_gravitational_acceleration: true
+    # Fuse: yaw orientation, yaw rate, linear acceleration (x, y)
+    imu0_config: [false, false, false, false, false, true,
+                  false, false, false, false, false, true,
+                  true,  true,  false]
+
+    process_noise_covariance:
+      [0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.04,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.02,  0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.015]

@@ -1,0 +1,85 @@
+<?xml version="1.0" ?>
+<!--
+  arena_frame_ucf — UCF Lunabotics 2026 Arena Outer Walls (SINGLE TEAM)
+  ======================================================================
+  The UCF map shows TWO mirrored arenas stacked in Y.
+  This model represents ONE team's arena (the lower half of the full map).
+
+  Interior dimensions: 8.14 m (X) × 4.57 m (Y)
+  Centered at origin:
+    X: [-4.07, 4.07]   left wall (construction side) → right wall (excavation side)
+    Y: [-2.285, 2.285] bottom wall → top wall
+
+  Wall thickness: 0.1 m
+  Wall height:    0.6 m
+
+  Only outer walls — no internal walls between zones
+  (zones are open in the real arena).
+-->
+<sdf version='1.7'>
+  <model name='arena_frame_ucf'>
+    <pose>0 0 0 0 0 0</pose>
+    <static>true</static>
+
+    <!-- Left Wall (construction side)  X=-4.07, spans full Y 4.57 m -->
+    <link name='left_wall'>
+      <pose>-4.07 0 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry><box><size>0.1 4.57 0.6</size></box></geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry><box><size>0.1 4.57 0.6</size></box></geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Right Wall (excavation / fiducial side)  X=+4.07, spans full Y 4.57 m -->
+    <link name='right_wall'>
+      <pose>4.07 0 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry><box><size>0.1 4.57 0.6</size></box></geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry><box><size>0.1 4.57 0.6</size></box></geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Top Wall  Y=+2.285, spans full X 8.14 m -->
+    <link name='top_wall'>
+      <pose>0 2.285 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry><box><size>8.14 0.1 0.6</size></box></geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry><box><size>8.14 0.1 0.6</size></box></geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Bottom Wall  Y=-2.285, spans full X 8.14 m -->
+    <link name='bottom_wall'>
+      <pose>0 -2.285 0.3 0 0 0</pose>
+      <collision name='collision'>
+        <geometry><box><size>8.14 0.1 0.6</size></box></geometry>
+      </collision>
+      <visual name='visual'>
+        <geometry><box><size>8.14 0.1 0.6</size></box></geometry>
+        <material>
+          <ambient>0.7 0.7 0.7 1</ambient>
+          <diffuse>0.7 0.7 0.7 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+  </model>
+</sdf>

@@ -1,0 +1,595 @@
+<?xml version="1.0" ?>
+<!--
+  arena_ucf.world — UCF Lunabotics 2026 Arena (SINGLE TEAM — our half)
+  ======================================================================
+  Source: UCF Lunabotics 2026 Guidebook, Figure 1 + Section 3
+
+  The UCF map shows TWO mirrored arenas stacked in Y (one per team).
+  This world simulates ONE team's arena only.
+
+  Arena interior: 8.14 m wide (X) × 4.57 m long (Y)
+  Centered at world origin:
+    X: [-4.07,  4.07]   left = Construction Zone, right = Excavation Zone
+    Y: [-2.285, 2.285]  bottom → top (our half of the full 9.14 m map)
+
+  Zone layout (Figure 1, left to right):
+    Construction zone:  X ∈ [-4.07, -2.07]  (2.00 m wide)  — 2 BERM targets
+    Obstacle zone:      X ∈ [-2.07,  0.07]  (2.14 m wide)  — slalom boulders + craters
+    Excavation zone:    X ∈ [ 0.07,  4.07]  (4.00 m wide)  — robot starts here
+    Starting sub-zone:  X ∈ [ 2.07,  4.07], Y ∈ [-2.285, 0.00] (lower) or [0.00, 2.285] (upper)
+
+  Robot starting positions (randomly selected per run):
+    Lower start: (3.47, -1.00, 0.20)  yaw = π  (facing -X toward construction)
+    Upper start: (3.47,  1.00, 0.20)  yaw = π
+
+  Obstacles (per spec §3.1):
+    Boulders: 3 cylinders, dia 30–40 cm, random heights, obstacle zone slalom
+    Craters:  3 craters, max 40–50 cm wide and deep, obstacle zone slalom
+
+  Crater implementation (same technique as arena_easy.world):
+    Ground is tiled with deliberate rectangular gaps at crater centres.
+    Each crater = gap + floor disk at -depth + 4 rim wall boxes.
+    LiDAR rays through gap return below-ground → perceived as craters.
+
+  Crater gap holes (0.50 m × 0.50 m):
+    Crater 1: centre (-0.40,  1.00), gap X ∈ [-0.65, -0.15], Y ∈ [ 0.75,  1.25]
+    Crater 2: centre (-1.10, -1.20), gap X ∈ [-1.35, -0.85], Y ∈ [-1.45, -0.95]
+    Crater 3: centre (-1.80,  0.50), gap X ∈ [-2.05, -1.55], Y ∈ [ 0.25,  0.75]
+
+  Gravity: Moon (-1.62 m/s²)
+-->
+<sdf version="1.6">
+  <world name="lunabotics_ucf">
+
+    <!-- ==================== PHYSICS ==================== -->
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <gravity>0 0 -1.62</gravity>  <!-- Moon gravity -->
+    </physics>
+
+    <!-- ==================== LIGHTING ==================== -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <scene>
+      <ambient>0.3 0.3 0.3 1</ambient>
+      <background>0.0 0.0 0.0 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- ==================== ARENA FRAME ==================== -->
+    <!--
+      UCF arena outer walls: 8.14 m × 4.57 m (single team half)
+      Left wall = construction side  (X = -4.07)
+      Right wall = excavation side   (X = +4.07)  ← Fiducial Rail mounted here
+    -->
+    <include>
+      <uri>model://arena_frame_ucf</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <!-- ==================== FIDUCIAL RAIL ==================== -->
+    <!--
+      Mounted on the inner face of the right (excavation-side) wall.
+      In the real arena: a long board with AprilTag fiducials for robot localisation.
+      Represented here as a thin white strip spanning the full arena height.
+    -->
+    <model name="fiducial_rail">
+      <static>true</static>
+      <pose>3.92 0 0.30 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>0.02 4.57 0.40</size></box></geometry>
+          <material>
+            <ambient>0.95 0.95 0.95 1</ambient>
+            <diffuse>1.00 1.00 1.00 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- AprilTag board — right-wall centre for initial absolute position fix -->
+    <include>
+      <uri>model://apriltag_board</uri>
+      <pose>3.92 0.0 0.34 0 1.57 3.14159</pose>
+    </include>
+
+    <!-- ==================== GROUND (TILED — with 3 crater gaps) ==================== -->
+    <!--
+      Box segments cover the entire arena floor (Z = -0.01) leaving three
+      0.50 × 0.50 m rectangular holes for the craters.
+
+      Gap locations (X_left, X_right, Y_bottom, Y_top):
+        Crater 1: [-0.65, -0.15], [ 0.75,  1.25]
+        Crater 2: [-1.35, -0.85], [-1.45, -0.95]
+        Crater 3: [-2.05, -1.55], [ 0.25,  0.75]
+
+      Tiling X-strips (sorted left→right):
+        Strip A:   X ∈ [-4.07, -2.05]  full Y slab
+        Strip B:   X ∈ [-2.05, -1.55]  split around crater-3 Y gap
+        Strip C:   X ∈ [-1.55, -1.35]  full Y bridge
+        Strip D:   X ∈ [-1.35, -0.85]  split around crater-2 Y gap
+        Strip E:   X ∈ [-0.85, -0.65]  full Y bridge
+        Strip F:   X ∈ [-0.65, -0.15]  split around crater-1 Y gap
+        Strip G:   X ∈ [-0.15,  4.07]  full Y slab (right half)
+    -->
+
+    <!-- Seg 1 — Strip A: X ∈ [-4.07, -2.05], full Y (2.02 × 4.57) -->
+    <model name="ground_seg_1">
+      <static>true</static>
+      <pose>-3.06 0 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.02 4.57 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>2.02 4.57 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 2a — Strip B below crater-3 gap: Y ∈ [-2.285, 0.25] (2.535 tall) -->
+    <model name="ground_seg_2a">
+      <static>true</static>
+      <pose>-1.80 -1.0175 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 2.535 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 2.535 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 2b — Strip B above crater-3 gap: Y ∈ [0.75, 2.285] (1.535 tall) -->
+    <model name="ground_seg_2b">
+      <static>true</static>
+      <pose>-1.80 1.5175 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 1.535 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 1.535 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 3 — Strip C bridge: X ∈ [-1.55, -1.35], full Y (0.20 × 4.57) -->
+    <model name="ground_seg_3">
+      <static>true</static>
+      <pose>-1.45 0 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.20 4.57 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.20 4.57 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 4a — Strip D below crater-2 gap: Y ∈ [-2.285, -1.45] (0.835 tall) -->
+    <model name="ground_seg_4a">
+      <static>true</static>
+      <pose>-1.10 -1.8675 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.835 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 0.835 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 4b — Strip D above crater-2 gap: Y ∈ [-0.95, 2.285] (3.235 tall) -->
+    <model name="ground_seg_4b">
+      <static>true</static>
+      <pose>-1.10 0.6675 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 3.235 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 3.235 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 5 — Strip E bridge: X ∈ [-0.85, -0.65], full Y (0.20 × 4.57) -->
+    <model name="ground_seg_5">
+      <static>true</static>
+      <pose>-0.75 0 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.20 4.57 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.20 4.57 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 6a — Strip F below crater-1 gap: Y ∈ [-2.285, 0.75] (3.035 tall) -->
+    <model name="ground_seg_6a">
+      <static>true</static>
+      <pose>-0.40 -0.7675 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 3.035 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 3.035 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 6b — Strip F above crater-1 gap: Y ∈ [1.25, 2.285] (1.035 tall) -->
+    <model name="ground_seg_6b">
+      <static>true</static>
+      <pose>-0.40 1.7675 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 1.035 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>0.50 1.035 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Seg 7 — Strip G: X ∈ [-0.15, 4.07], full Y (4.22 × 4.57) -->
+    <model name="ground_seg_7">
+      <static>true</static>
+      <pose>1.96 0 -0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>4.22 4.57 0.02</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="vis"><geometry><box><size>4.22 4.57 0.02</size></box></geometry>
+          <material><ambient>0.42 0.40 0.38 1</ambient><diffuse>0.52 0.50 0.48 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== ZONE MARKERS (visual only, Z=0.001) ==================== -->
+    <!--
+      Thin coloured overlays painted on the ground surface to delineate zones.
+      No collision — purely visual reference in Gazebo.
+    -->
+
+    <!-- Construction zone — pale tan: X ∈ [-4.07, -2.07], centre (-3.07, 0) -->
+    <model name="zone_construction">
+      <static>true</static>
+      <pose>-3.07 0 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>2.00 4.57 0.002</size></box></geometry>
+          <material><ambient>0.50 0.45 0.35 1</ambient><diffuse>0.60 0.55 0.42 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Obstacle zone — dark grey: X ∈ [-2.07, 0.07], centre (-1.00, 0) -->
+    <model name="zone_obstacle">
+      <static>true</static>
+      <pose>-1.00 0 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>2.14 4.57 0.002</size></box></geometry>
+          <material><ambient>0.30 0.30 0.30 1</ambient><diffuse>0.38 0.38 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Excavation zone — warm brown: X ∈ [0.07, 4.07], centre (2.07, 0) -->
+    <model name="zone_excavation">
+      <static>true</static>
+      <pose>2.07 0 0.001 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>4.00 4.57 0.002</size></box></geometry>
+          <material><ambient>0.38 0.28 0.20 1</ambient><diffuse>0.48 0.36 0.26 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== BERM TARGETS (construction zone) ==================== -->
+    <!--
+      Two berm deposit targets in the construction zone (Figure 1).
+      Upper berm: Y ≈ +1.30 m (roughly 1 m from top wall)
+      Lower berm: Y ≈ -1.30 m (symmetric, roughly 1 m from bottom wall)
+      Size approximated from figure: 1.5 m × 1.0 m deposit area.
+    -->
+
+    <!-- Upper BERM target — centred at (-3.07, 1.30) -->
+    <model name="berm_target_upper">
+      <static>true</static>
+      <pose>-3.07 1.30 0.002 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>1.50 1.00 0.004</size></box></geometry>
+          <material><ambient>0.85 0.20 0.20 1</ambient><diffuse>0.95 0.25 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Lower BERM target — centred at (-3.07, -1.30) -->
+    <model name="berm_target_lower">
+      <static>true</static>
+      <pose>-3.07 -1.30 0.002 0 0 0</pose>
+      <link name="link">
+        <visual name="vis">
+          <geometry><box><size>1.50 1.00 0.004</size></box></geometry>
+          <material><ambient>0.85 0.20 0.20 1</ambient><diffuse>0.95 0.25 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== BOULDERS (obstacle zone) ==================== -->
+    <!--
+      Per spec §3.1: ≥3 boulders, diameter 30–40 cm, random heights.
+      Arranged in a slalom pattern within the obstacle zone Y ∈ [-2.285, 2.285].
+
+      Boulder 1: lower entrance (-0.30, -1.50) → robot must go high first
+      Boulder 2: upper middle  (-0.90,  1.50) → then cut low
+      Boulder 3: lower exit    (-1.60, -0.50) → slalom continues
+    -->
+
+    <!-- Boulder 1: (-0.30, -1.50) — r=0.19m, h=0.22m -->
+    <model name="boulder_1">
+      <static>true</static>
+      <pose>-0.30 -1.50 0.11 0 0 0.4</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><cylinder><radius>0.19</radius><length>0.22</length></cylinder></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.19</radius><length>0.22</length></cylinder></geometry>
+          <material>
+            <ambient>0.30 0.32 0.38 1</ambient>
+            <diffuse>0.40 0.42 0.50 1</diffuse>
+            <specular>0.05 0.05 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Boulder 2: (-0.90, 1.50) — r=0.17m, h=0.18m -->
+    <model name="boulder_2">
+      <static>true</static>
+      <pose>-0.90 1.50 0.09 0 0 1.2</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><cylinder><radius>0.17</radius><length>0.18</length></cylinder></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.17</radius><length>0.18</length></cylinder></geometry>
+          <material>
+            <ambient>0.30 0.32 0.38 1</ambient>
+            <diffuse>0.40 0.42 0.50 1</diffuse>
+            <specular>0.05 0.05 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Boulder 3: (-1.60, -0.50) — r=0.20m, h=0.20m -->
+    <model name="boulder_3">
+      <static>true</static>
+      <pose>-1.60 -0.50 0.10 0 0 2.5</pose>
+      <link name="link">
+        <collision name="col">
+          <geometry><cylinder><radius>0.20</radius><length>0.20</length></cylinder></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.20</radius><length>0.20</length></cylinder></geometry>
+          <material>
+            <ambient>0.30 0.32 0.38 1</ambient>
+            <diffuse>0.40 0.42 0.50 1</diffuse>
+            <specular>0.05 0.05 0.05 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== CRATERS (obstacle zone) ==================== -->
+    <!--
+      Per spec §3.1: ≥3 craters, max 40–50 cm wide and deep.
+      Each crater = floor disk at -depth + 4 rim wall boxes.
+      The gap in the tiled ground above is defined in the GROUND section.
+
+      All craters: 0.50 m wide (gap), 0.45 m deep.
+      Floor disk r=0.35 m (wider than gap so angled LiDAR rays still hit it).
+      Rim walls: height = 0.48 m (from -0.45 to +0.03), width 0.50 m, thickness 0.04 m.
+      Wall centre Z = (-0.45 + 0.03) / 2 = -0.21.
+      Wall offset from centre = 0.25 (half-gap) + 0.02 (half-wall) = 0.27 m.
+    -->
+
+    <!--
+      CRATER 1 — centre (-0.40, 1.00), depth=0.45m
+      Gap: X ∈ [-0.65, -0.15], Y ∈ [0.75, 1.25]
+    -->
+    <model name="crater_1_floor">
+      <static>true</static>
+      <pose>-0.40 1.00 -0.45 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry>
+          <material><ambient>0.20 0.18 0.16 1</ambient><diffuse>0.26 0.24 0.22 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_1_wall_north">
+      <static>true</static>
+      <pose>-0.40 1.27 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_1_wall_south">
+      <static>true</static>
+      <pose>-0.40 0.73 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_1_wall_east">
+      <static>true</static>
+      <pose>-0.13 1.00 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_1_wall_west">
+      <static>true</static>
+      <pose>-0.67 1.00 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      CRATER 2 — centre (-1.10, -1.20), depth=0.45m
+      Gap: X ∈ [-1.35, -0.85], Y ∈ [-1.45, -0.95]
+    -->
+    <model name="crater_2_floor">
+      <static>true</static>
+      <pose>-1.10 -1.20 -0.45 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry>
+          <material><ambient>0.20 0.18 0.16 1</ambient><diffuse>0.26 0.24 0.22 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_2_wall_north">
+      <static>true</static>
+      <pose>-1.10 -0.93 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_2_wall_south">
+      <static>true</static>
+      <pose>-1.10 -1.47 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_2_wall_east">
+      <static>true</static>
+      <pose>-0.83 -1.20 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_2_wall_west">
+      <static>true</static>
+      <pose>-1.37 -1.20 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      CRATER 3 — centre (-1.80, 0.50), depth=0.45m
+      Gap: X ∈ [-2.05, -1.55], Y ∈ [0.25, 0.75]
+    -->
+    <model name="crater_3_floor">
+      <static>true</static>
+      <pose>-1.80 0.50 -0.45 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.35</radius><length>0.02</length></cylinder></geometry>
+          <material><ambient>0.20 0.18 0.16 1</ambient><diffuse>0.26 0.24 0.22 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_3_wall_north">
+      <static>true</static>
+      <pose>-1.80 0.77 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_3_wall_south">
+      <static>true</static>
+      <pose>-1.80 0.23 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.50 0.04 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.50 0.04 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_3_wall_east">
+      <static>true</static>
+      <pose>-1.53 0.50 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="crater_3_wall_west">
+      <static>true</static>
+      <pose>-2.07 0.50 -0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.04 0.50 0.48</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.04 0.50 0.48</size></box></geometry>
+          <material><ambient>0.35 0.32 0.28 1</ambient><diffuse>0.42 0.38 0.34 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

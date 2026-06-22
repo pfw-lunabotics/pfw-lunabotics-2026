@@ -1,0 +1,47 @@
+PFW Lunabotics 2026 — All Rights Reserved
+==========================================
+
+Copyright (c) 2026 Purdue University Fort Wayne (PFW) Lunabotics Team.
+All rights reserved.
+
+This source code is published publicly for the sole purposes of review,
+evaluation, reference, and educational viewing. Public visibility does NOT
+grant any license to use the code.
+
+PERMITTED
+---------
+  • Viewing and reading this source code.
+
+NOT PERMITTED without prior written permission from the PFW Lunabotics Team
+--------------------------------------------------------------------------
+  • Copying, reproducing, or republishing any portion of this code.
+  • Modifying, adapting, translating, or creating derivative works.
+  • Using this code, in whole or in part, in any project, product,
+    competition entry, or research.
+  • Distributing, sublicensing, selling, or otherwise transferring this code.
+  • Removing or altering this notice.
+
+To request permission, contact the PFW Lunabotics Team at lunabotics@pfw.edu.
+
+THIRD-PARTY COMPONENTS (NOT COVERED BY THIS LICENSE)
+----------------------------------------------------
+The following directories contain third-party open-source software that is
+NOT owned by the PFW Lunabotics Team and is NOT subject to this license.
+Each remains governed by its own license, found within its directory:
+
+  • src/point_lio_ros2/     — see src/point_lio_ros2/LICENSE
+                               (and src/point_lio_ros2/include/IKFoM/LICENSE)
+  • src/unilidar_sdk2/      — see src/unilidar_sdk2/LICENSE
+
+Your rights to those components are defined entirely by their respective
+licenses, not by this file.
+
+NO WARRANTY
+-----------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF OR OTHER
+DEALINGS IN THE SOFTWARE.

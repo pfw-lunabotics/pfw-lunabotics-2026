@@ -1,0 +1,14 @@
+# Lunabotics 2026 — ST3215 Deposition Servo Driver Parameters
+# Waveshare bus servo adapter (CH343 vendor 1a86:55d3) on USB → ST3215 servo
+#
+# To find the adapter's stable by-id symlink:
+#   ls -l /dev/serial/by-id/ | grep 1a86
+# If you swap to a different adapter, update serial_port to the new descriptor.
+
+servo_driver:
+  ros__parameters:
+    serial_port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B14032921-if00
+    baud_rate: 1000000              # ST3215 default
+    servo_id: 1                      # Servo's ID on the bus
+    stowed_pos: 3283                 # Raw position for stowed (0°)
+    poll_rate: 5.0                   # Hz — position read back rate

@@ -1,0 +1,10 @@
+# UCF Lunabotics 2026 Arena — Nav2 Occupancy Grid Map
+# Single-team arena: 8.14 m (X) × 4.57 m (Y)
+# Arena interior: X ∈ [-4.07, 4.07], Y ∈ [-2.285, 2.285]
+# Map includes 0.5 m padding + 0.1 m walls on all sides
+image: ucf_arena.pgm
+resolution: 0.05
+origin: [-4.670, -2.885, 0.0]   # world coords of map bottom-left corner
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196

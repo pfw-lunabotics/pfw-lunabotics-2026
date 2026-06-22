@@ -1,0 +1,85 @@
+# robot_localization EKF Configuration — HARDWARE (with wheel encoders)
+# Lunabotics 2026 — PFW Team
+#
+# Fuses Point-LIO odometry + wheel encoder odometry + L2 IMU.
+# Point-LIO handles primary localization (map→odom TF).
+# Wheel encoders provide velocity feedback for stall detection and EKF.
+# EKF provides odom→base_footprint TF and /odometry/filtered for Nav2.
+#
+# State vector: [x, y, z, roll, pitch, yaw,
+#                vx, vy, vz, vroll, vpitch, vyaw,
+#                ax, ay, az]
+
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: false
+    frequency: 30.0
+    two_d_mode: true            # Arena is flat — ignore Z, roll, pitch
+    publish_tf: true            # EKF publishes odom→base_footprint on hardware
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom           # EKF operates in odom frame
+
+    # ---------------------------------------------------------------
+    # Source 0: Point-LIO odometry (primary position + velocity)
+    # Provides drift-corrected pose from LiDAR-inertial fusion
+    # ---------------------------------------------------------------
+    odom0: /point_lio/odom
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+    # Fuse: position (x, y), yaw, velocity (vx, vy), yaw rate
+    odom0_config: [true,  true,  false, false, false, true,
+                   true,  true,  false, false, false, true,
+                   false, false, false]
+
+    # ---------------------------------------------------------------
+    # Source 1: Wheel encoder odometry (from pico_bridge)
+    # Provides velocity from encoder pulse counting (PPR=1098)
+    # Only fuse velocity — position drifts over time
+    # ---------------------------------------------------------------
+    odom1: /odom
+    odom1_differential: false
+    odom1_relative: false
+    odom1_queue_size: 20
+    # Fuse: velocity only (vx, vyaw) — let Point-LIO handle position
+    odom1_config: [false, false, false, false, false, false,
+                   true,  false, false, false, false, true,
+                   false, false, false]
+
+    # ---------------------------------------------------------------
+    # Source 2: Unitree L2 IMU (high-rate orientation + acceleration)
+    # ---------------------------------------------------------------
+    imu0: /unilidar/imu
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 50
+    imu0_remove_gravitational_acceleration: true
+    # Fuse: yaw orientation, yaw rate, linear acceleration (x, y)
+    imu0_config: [false, false, false, false, false, true,
+                  false, false, false, false, false, true,
+                  true,  true,  false]
+
+    # ---------------------------------------------------------------
+    # Process noise covariance
+    # Lower than IMU-only config since Point-LIO provides position
+    # ---------------------------------------------------------------
+    process_noise_covariance:
+      [0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.04,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.02,  0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.015]

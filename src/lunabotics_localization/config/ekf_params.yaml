@@ -1,0 +1,74 @@
+# robot_localization EKF Configuration
+# Lunabotics 2026 — PFW Team
+#
+# Fuses two sources:
+#   1. Wheel odometry (/odom from Gazebo diff_drive or real encoders)
+#   2. Unitree L2 built-in IMU (/unilidar/imu)
+#
+# Publishes: /odometry/filtered (nav_msgs/Odometry)
+# TF: odom → base_footprint (when world_frame = odom)
+#
+# State vector: [x, y, z, roll, pitch, yaw,
+#                vx, vy, vz, vroll, vpitch, vyaw,
+#                ax, ay, az]
+
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 30.0
+    two_d_mode: true            # Arena is flat — ignore Z, roll, pitch
+    publish_tf: false           # Gazebo diff_drive already publishes odom→base_footprint
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom           # EKF operates in odom frame
+
+    # ---------------------------------------------------------------
+    # Source 0: Wheel odometry
+    # ---------------------------------------------------------------
+    odom0: /odom
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+    # [x, y, z, roll, pitch, yaw,
+    #  vx, vy, vz, vroll, vpitch, vyaw,
+    #  ax, ay, az]
+    odom0_config: [true,  true,  false, false, false, false,
+                   true,  true,  false, false, false, true,
+                   false, false, false]
+
+    # ---------------------------------------------------------------
+    # Source 1: Unitree L2 IMU
+    # ---------------------------------------------------------------
+    imu0: /unilidar/imu
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 50
+    imu0_remove_gravitational_acceleration: true
+    # Fuse: orientation (yaw only, 2D mode), angular velocity (yaw rate),
+    #       linear acceleration (x, y)
+    imu0_config: [false, false, false, false, false, true,
+                  false, false, false, false, false, true,
+                  true,  true,  false]
+
+    # ---------------------------------------------------------------
+    # Process noise covariance (tuned for differential drive on regolith)
+    # ---------------------------------------------------------------
+    process_noise_covariance:
+      [0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.04,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.02,  0.0,   0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,
+       0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.015]

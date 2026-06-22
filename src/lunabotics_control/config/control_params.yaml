@@ -1,0 +1,101 @@
+# Lunabotics 2026 — Control Parameters
+# Robot: 4-wheel skid-steer, wheel separation 0.65 m, wheel diameter 0.3 m
+
+cmd_vel_relay:
+  ros__parameters:
+    # Velocity limits
+    max_linear_vel:    0.4    # m/s   — competition speed
+    max_angular_vel:   0.8    # rad/s — matches Nav2 config
+    max_linear_accel:  0.3    # m/s²  — gentle ramp
+    max_angular_accel: 0.8    # rad/s²
+
+    publish_rate:      20.0   # Hz
+    watchdog_timeout:  0.5    # s — stop if no cmd_vel for 500 ms
+
+    # In simulation: relay directly to /cmd_vel_safe (Gazebo reads /cmd_vel)
+    # On real hardware: set to the motor driver's input topic
+    output_topic: /cmd_vel_safe
+
+    # Disable software e-stop for competition (hands-free, can't clear it)
+    # Physical E-STOP button cuts power at hardware level
+    software_estop_enabled: false
+
+teleop_keyboard:
+  ros__parameters:
+    # Driving
+    linear_step:  0.03   # m/s per keypress
+    angular_step: 0.08   # rad/s per keypress
+    max_linear:   0.4    # m/s — matches relay limit
+    max_angular:  0.8    # rad/s
+
+    # Excavation belt motor (PWM 0-65535)
+    dig_pwm_default: 6000    # starting PWM — matches autonomous optimal start
+    dig_pwm_step:    1500    # per 'f'/'v' keypress
+    dig_pwm_min:     5000    # lowest usable speed
+    dig_pwm_max:     65535   # full speed
+
+    # Actuator (Sabertooth via Pico GP21)
+    actuator_up_val:    100  # raise (+100 = full retract)
+    actuator_down_val: -100  # lower (-100 = full extend)
+
+    # Deposition servo (ST3215)
+    dump_angle:          107.0  # degrees — dump position
+    stow_angle:          0.0    # degrees — stowed position
+    servo_move_time_ms:  4500   # ms — servo travel time
+
+    # Health monitoring
+    pico_timeout: 3.0    # seconds — warn if no /pico/status
+    imu_timeout:  3.0    # seconds — warn if no /unilidar/imu
+
+# Gamepad teleop (Switch Pro / Xbox controller)
+# Launch: ros2 launch lunabotics_control control.launch.py use_joystick:=true
+# To check your controller's mapping: ros2 topic echo /joy
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.1
+    autorepeat_rate: 20.0
+
+teleop_joy:
+  ros__parameters:
+    # Axis indices (check with: ros2 topic echo /joy)
+    axis_linear:  1      # Left stick Y
+    axis_angular: 0      # Left stick X
+    axis_dpad_x:  6      # D-pad horizontal
+    axis_dpad_y:  7      # D-pad vertical
+
+    # Velocity scaling — stick-up (axis=-1) * negative scale = positive linear.x = ROS forward
+    # pico_bridge handles motor inversion at the hardware boundary
+    linear_scale:  -0.3   # m/s max — negative because joy axis is inverted
+    angular_scale: -0.8   # rad/s max
+
+    # Button indices (Switch Pro via hid-nintendo / generic)
+    btn_deadman:        4    # LB / L — hold to drive
+    btn_manual_toggle:  0    # A — toggle MANUAL / OBSERVER
+    btn_estop:          1    # B — toggle E-STOP
+    btn_excavation:     2    # X — toggle excavation ON/OFF
+    btn_full_stop:      3    # Y — FULL STOP
+    btn_dump:           6    # ZL / LT — dump servo
+    btn_stow:           7    # ZR / RT — stow servo
+    btn_diagnostics:    8    # - / Back — diagnostics
+    btn_actuator_stop: 10    # L-stick press — stop actuator
+
+    # Excavation belt motor (PWM 0-65535)
+    dig_pwm_default: 6000
+    dig_pwm_step:    1500
+    dig_pwm_min:     5000
+    dig_pwm_max:     65535
+
+    # Actuator
+    actuator_up_val:    100
+    actuator_down_val: -100
+
+    # Deposition servo
+    dump_angle:          107.0
+    stow_angle:          0.0
+    servo_move_time_ms:  4500
+
+    # Health monitoring
+    pico_timeout: 3.0
+    imu_timeout:  3.0
+    joy_timeout:  5.0

@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lunabotics_perception</name>
+  <version>0.0.1</version>
+  <description>Unified obstacle perception using crater inversion for Lunabotics 2026</description>
+  <maintainer email="lunabotics@pfw.edu">PFW Lunabotics Team</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS2 dependencies -->
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_ros</depend>
+  
+  <!-- Point cloud processing -->
+  <depend>sensor_msgs_py</depend>
+  <depend>nav_msgs</depend>
+
+  <!-- Python scientific libraries (pip) -->
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-sklearn</exec_depend>
+
+  <!-- Custom messages -->
+  <depend>luna_msgs</depend>
+  
+  <!-- Launch dependencies -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

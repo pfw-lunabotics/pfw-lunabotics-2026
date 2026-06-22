@@ -1,0 +1,31 @@
+# Lunabotics 2026 — Pico Bridge Parameters
+# 4-wheel skid-steer with BLD-510B BLDC drivers + encoder feedback
+
+pico_bridge:
+  ros__parameters:
+    serial_port: /dev/serial/by-id/usb-MicroPython_Board_in_FS_mode_e6647c156730ab24-if00  # Pico USB — stable symlink
+    baud_rate: 115200
+    wheel_separation: 0.65          # Track width (meters) — same side-to-side distance
+    wheel_radius: 0.15              # Hub motor wheel radius (meters)
+    max_motor_speed: 0.6            # Wheel surface speed at PWM 65535 (m/s) — tune on hardware
+    publish_rate: 20.0              # Hz — matches cmd_vel_relay rate
+
+    # Encoder odometry
+    encoder_ppr: 1098               # Pulses per revolution (measured 2026-05-10)
+    publish_odom: true              # Publish /odom from wheel encoders
+    odom_frame: odom
+    base_frame: base_footprint
+
+    # Stall detection (encoder-based, faster than IMU-only)
+    stall_timeout: 1.0              # Seconds of no encoder motion before stall recovery
+    stall_min_pwm: 3000             # PWM below this = not really commanding motion
+    kick_extra_pwm: 20000           # Extra PWM during recovery kick
+    kick_duration: 0.5              # Duration of kick pulse (seconds)
+
+    # Wheel slip detection (sinking in sand — wheels spin but robot doesn't move)
+    slip_detection: true             # Enable slip detection + auto-boost
+    slip_timeout: 1.0               # Seconds of slip before boost kicks in
+    slip_boost_step: 0.15           # PWM multiplier increase per step (1.0 → 1.15 → 1.30...)
+    slip_boost_max: 1.8             # Max multiplier cap (80% above commanded speed)
+    slip_boost_interval: 0.5        # Seconds between boost increments (ramps up gradually)
+    slip_accel_threshold: 0.3       # IMU accel deviation (m/s²) that means robot is actually moving

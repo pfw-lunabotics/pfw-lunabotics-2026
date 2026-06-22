@@ -1,0 +1,188 @@
+map_server:
+  ros__parameters:
+    use_sim_time: True
+    yaml_filename: ""   # overridden at launch time via map_yaml_file argument
+    bond_timeout: 10.0
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: True
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odometry/filtered
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    # BT XML set in navigation.launch.py → nav_bt_no_spin.xml
+    # Replans only when path becomes blocked + NO SPIN recovery.
+    # Checks path validity at 1Hz (cheap), only invokes SmacPlanner2D when
+    # an obstacle actually blocks the current path. Recovery: costmap clear,
+    # wait, backup (no spin — sinking risk on regolith).
+
+controller_server:
+  ros__parameters:
+    use_sim_time: True
+    controller_frequency: 10.0     # 10Hz saves ~50% CPU vs 20Hz, still responsive at 0.1m/s
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.15
+      yaw_goal_tolerance: 0.1
+
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      min_vel_x: 0.05           # Anti-sink: always creep forward during turns (no pure rotation)
+      min_vel_y: 0.0
+      max_vel_x: 0.4            # Competition speed — matches relay limit
+      max_vel_y: 0.0
+      max_vel_theta: 0.8        # Match relay angular limit
+      min_speed_xy: 0.0
+      max_speed_xy: 0.4
+      min_speed_theta: 0.0
+      acc_lim_x: 0.5
+      acc_lim_y: 0.0
+      acc_lim_theta: 0.8
+      decel_lim_x: -0.5
+      decel_lim_y: 0.0
+      decel_lim_theta: -0.8
+      vx_samples: 15            # More samples for wider speed range (0.05–0.4 m/s)
+      vy_samples: 1             # Skid-steer can't strafe — 1 sample (always 0)
+      vtheta_samples: 15        # More angular samples for smoother arc turns
+      sim_time: 2.5             # ~1m lookahead at 0.4 m/s — plan around obstacles early
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.5
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 3.0       # 3Hz local costmap — saves CPU, still reactive at crawl speed
+      publish_frequency: 1.0       # 1Hz publish — only for viz, doesn't affect navigation
+      global_frame: odom
+      robot_base_frame: base_footprint
+      use_sim_time: True
+      rolling_window: true
+      width: 6                     # 6m window — see obstacles early for local planning
+      height: 6
+      resolution: 0.05
+      # Rectangular footprint with 8cm buffer on each side
+      # Chassis: 0.92m x 0.66m → with buffer: 1.08m x 0.82m
+      # Format: [[x_front,y_left],[x_front,y_right],[x_rear,y_right],[x_rear,y_left]]
+      footprint: "[[0.54, 0.41], [0.54, -0.41], [-0.54, -0.41], [-0.54, 0.41]]"
+      transform_tolerance: 1.0
+      plugins: ["obstacle_layer", "inflation_layer"]
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: unified_obstacles
+        unified_obstacles:
+          topic: /perception/unified_obstacles
+          sensor_frame: ""
+          observation_persistence: 0.5
+          max_obstacle_height: 2.0
+          min_obstacle_height: -0.5
+          clearing: True
+          marking: True
+          data_type: "PointCloud2"
+          obstacle_max_range: 6.0            # Match perception range_max
+          obstacle_min_range: 0.05
+          raytrace_max_range: 7.0
+          raytrace_min_range: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 2.5           # Lower = obstacles feel wider, safer paths
+        inflation_radius: 0.70             # 70cm buffer around obstacles
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 2.0        # 2Hz — feed new obstacles to global planner quickly
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      use_sim_time: True
+      footprint: "[[0.54, 0.41], [0.54, -0.41], [-0.54, -0.41], [-0.54, 0.41]]"
+      resolution: 0.05
+      track_unknown_space: true
+      transform_tolerance: 1.0
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: unified_obstacles
+        unified_obstacles:
+          topic: /perception/unified_obstacles
+          sensor_frame: ""
+          observation_persistence: 120.0     # 2 min — obstacles persist for full traverse (no 360° scan)
+          max_obstacle_height: 2.0
+          min_obstacle_height: -0.5
+          clearing: True
+          marking: True
+          data_type: "PointCloud2"
+          obstacle_max_range: 6.0            # Match perception range_max
+          obstacle_min_range: 0.05
+          raytrace_max_range: 7.0            # Clear free space beyond obstacle range
+          raytrace_min_range: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 2.5
+        inflation_radius: 0.70
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: True
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    # No Spin — spinning on regolith causes sinking + uses too much power
+    behavior_plugins: ["backup", "wait"]
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    global_frame: odom
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+planner_server:
+  ros__parameters:
+    use_sim_time: True
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.25
+      allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 2.0
+      cost_travel_multiplier: 2.0
+      use_final_approach_orientation: false
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.3
+        w_data: 0.2
+        tolerance: 1.0e-10

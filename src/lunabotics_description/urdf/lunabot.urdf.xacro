@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="lunabot">
+
+  <!-- ================================================================== -->
+  <!-- Real rover dimensions (from STL bounding box, mm → m)              -->
+  <!--   Length (X): 1.296 m   Width (Y): 0.733 m   Height (Z): 0.743 m  -->
+  <!-- Mesh is centered at origin by decimation script.                    -->
+  <!-- base_link sits at mesh_half_height above ground so mesh bottom      -->
+  <!-- aligns with Z=0 (ground plane).                                     -->
+  <!-- NOTE: if the robot appears rotated in Gazebo, adjust mesh_rpy.      -->
+  <!-- ================================================================== -->
+  <xacro:property name="mesh_half_height" value="0.372"/>
+  <xacro:property name="mesh_rpy"         value="0 0 0"/>
+
+  <xacro:property name="wheel_radius"     value="0.15"/>
+  <xacro:property name="wheel_width"      value="0.10"/>
+  <xacro:property name="wheel_separation" value="0.65"/>
+  <xacro:property name="wheelbase"        value="0.80"/>
+
+  <!-- wheel center Z in base_link frame = wheel_radius - mesh_half_height -->
+  <xacro:property name="wheel_z" value="${wheel_radius - mesh_half_height}"/>
+
+  <!-- ================================================================== -->
+  <!-- Footprint (navigation origin, on ground)                           -->
+  <!-- ================================================================== -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${mesh_half_height}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ================================================================== -->
+  <!-- Base Link — full rover mesh                                         -->
+  <!-- Visual : decimated rover mesh (30k triangles)                       -->
+  <!-- Collision: simple box raised above wheel contact to avoid conflict  -->
+  <!-- ================================================================== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="${mesh_rpy}"/>
+      <geometry>
+        <mesh filename="package://lunabotics_description/meshes/rover_visual.stl"/>
+      </geometry>
+    </visual>
+    <collision>
+      <!-- Raised box covers body only; wheels handle ground contact -->
+      <origin xyz="0 0 0.10" rpy="0 0 0"/>
+      <geometry>
+        <box size="1.10 0.60 0.40"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="50.0"/>
+      <!-- Inertia for 50 kg box 1.296×0.733×0.743 m -->
+      <inertia ixx="3.50" ixy="0.0" ixz="0.0"
+               iyy="7.25" iyz="0.0"
+               izz="9.25"/>
+    </inertial>
+  </link>
+
+  <!-- ================================================================== -->
+  <!-- Wheels — 4 hub-motor driven wheels (skid-steer)                    -->
+  <!-- Each wheel has a BLDC hub motor (BLD-510B driver).                 -->
+  <!-- Visual is baked into rover mesh; these are physics-only.           -->
+  <!-- ================================================================== -->
+  <xacro:macro name="wheel" params="prefix x_offset y_reflect">
+    <link name="${prefix}_wheel">
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="4.0"/>
+        <inertia ixx="0.04" ixy="0.0" ixz="0.0"
+                 iyy="0.04" iyz="0.0"
+                 izz="0.07"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel"/>
+      <origin xyz="${x_offset} ${y_reflect * wheel_separation/2} ${wheel_z}" rpy="${-pi/2} 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel prefix="front_left"  x_offset="${wheelbase/2}"  y_reflect="1"/>
+  <xacro:wheel prefix="front_right" x_offset="${wheelbase/2}"  y_reflect="-1"/>
+  <xacro:wheel prefix="rear_left"   x_offset="${-wheelbase/2}" y_reflect="1"/>
+  <xacro:wheel prefix="rear_right"  x_offset="${-wheelbase/2}" y_reflect="-1"/>
+
+  <!-- ================================================================== -->
+  <!-- Unitree L2 LiDAR — PERMANENT MOUNT: front-center on extension    -->
+  <!-- Extension plate rises from both sides of drivetrain front,       -->
+  <!-- extends forward, LiDAR rests on top.                              -->
+  <!-- Measured: bottom 47cm, top 54cm above ground → center 50.5cm     -->
+  <!-- base_link is at mesh_half_height (0.372m) above ground            -->
+  <!-- LiDAR Z in base_link frame: 0.505 - 0.372 = +0.133m              -->
+  <!-- LiDAR X: 62cm forward of center = +0.62m                         -->
+  <!--   (front of LiDAR 21cm ahead of drivetrain chassis front)        -->
+  <!-- LiDAR Y: centered on chassis = 0.0m                              -->
+  <!-- ================================================================== -->
+  <link name="unilidar_lidar">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.0 0.0 0.8 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.03" length="0.065"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+               iyy="0.001" iyz="0.0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="unilidar_lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="unilidar_lidar"/>
+    <origin xyz="0.62 0.0 0.133" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Unitree L2 built-in IMU (same physical unit as LiDAR) -->
+  <link name="unilidar_imu">
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+               iyy="0.0001" iyz="0.0"
+               izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="unilidar_imu_joint" type="fixed">
+    <parent link="unilidar_lidar"/>
+    <child link="unilidar_imu"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Include Gazebo plugins / sensors -->
+  <xacro:include filename="$(find lunabotics_description)/urdf/lunabot_gazebo.xacro"/>
+
+</robot>
